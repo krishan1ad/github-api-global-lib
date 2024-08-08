@@ -1,5 +1,5 @@
 def call(Map params) {
-    def sourceUrl = 'https://repository.mpsa.com'  // Updated to HTTPS
+    def sourceUrl = 'https://repository.mpsa.com'
     def targetUrl = 'http://192.168.1.148:8081/artifactory'
     def sourceRepo = params.sourceRepo
     def sourceCredentialsId = params.sourceCredentialsId
@@ -37,29 +37,38 @@ def call(Map params) {
                 def artifactPath = artifact.replaceFirst("^/${sourceRepo}/", '') // Remove leading repo path
                 def artifactName = artifactPath.split('/').last()
                 def artifactDir = artifactPath - "/${artifactName}"
-                def localFile = "${tempDir}/${artifactPath}"
-                def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}"
-                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}"
+                def localFile = "${tempDir}/${artifactPath.replaceAll('//', '/')}"
 
                 // Ensure the local directory structure exists
                 sh """
-                    mkdir -p "${tempDir}/${artifactDir}"
+                    mkdir -p "${tempDir}/${artifactDir.replaceAll('//', '/').trim()}"
                 """
 
+                // Construct URLs
+                def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath.replaceAll('//', '/')}"
+                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath.replaceAll('//', '/')}"
+                
+                echo "Downloading from ${sourceArtifactUrl} to ${localFile}"
+                
                 // Download the artifact
-                sh """
-                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}" > /dev/null 2>&1
-                """
+                def downloadStatus = sh(script: """
+                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}"
+                """, returnStatus: true)
+
+                if (downloadStatus != 0) {
+                    error "Failed to download artifact: ${artifactPath}"
+                }
 
                 if (fileExists(localFile)) {
                     // Ensure the target directory structure exists on the remote server
+                    def targetDir = "${targetUrl}/${targetRepo}/${artifactDir.replaceAll('//', '/').trim()}"
                     sh """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetUrl}/${targetRepo}/${artifactDir}/" > /dev/null 2>&1 || true
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDir}/" || true
                     """
 
                     // Upload the artifact
                     def uploadStatus = sh(script: """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}" > /dev/null 2>&1
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}"
                     """, returnStatus: true)
 
                     if (uploadStatus == 0) {
@@ -69,7 +78,7 @@ def call(Map params) {
                     }
 
                     // Clean up the temporary file
-                    sh "rm '${localFile}'"
+                    sh "rm -f '${localFile}'"
                 } else {
                     error "Failed to download artifact: ${artifactPath}"
                 }
