@@ -15,7 +15,7 @@ def call(
     def downloadSpecMap = [
         "files": [
             [
-                "pattern": "${sourceRepo}/${sourceArtifactPath}/**", // Include subfolders
+                "pattern": "${sourceRepo}/${sourceArtifactPath}/**", // Include all files and subfolders
                 "target": "download/"
             ]
         ]
@@ -26,7 +26,7 @@ def call(
     def uploadSpecMap = [
         "files": [
             [
-                "pattern": "download/${sourceArtifactPath}/**", // Include subfolders
+                "pattern": "download/${sourceArtifactPath}/**", // Include all files and subfolders
                 "target": "${sourceRepo}/${sourceArtifactPath}/"
             ]
         ]
@@ -36,7 +36,9 @@ def call(
     try {
         // Download artifacts from source Artifactory
         withCredentials([usernamePassword(credentialsId: sourceCredentialsId, passwordVariable: 'SOURCE_PASSWORD', usernameVariable: 'SOURCE_USERNAME')]) {
+            echo "Downloading artifacts from ${sourceUrl}/${sourceRepo}/${sourceArtifactPath}"
             def downloadResponse = sourceArtifactory.download(downloadSpecJson)
+            echo "Download response: ${downloadResponse}"
             if (downloadResponse) {
                 echo "Successfully downloaded artifacts from ${sourceUrl}/${sourceRepo}/${sourceArtifactPath}"
             } else {
@@ -46,7 +48,9 @@ def call(
 
         // Upload artifacts to target Artifactory
         withCredentials([usernamePassword(credentialsId: targetCredentialsId, passwordVariable: 'TARGET_PASSWORD', usernameVariable: 'TARGET_USERNAME')]) {
+            echo "Uploading artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
             def uploadResponse = targetArtifactory.upload(uploadSpecJson)
+            echo "Upload response: ${uploadResponse}"
             if (uploadResponse) {
                 echo "Successfully uploaded artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
             } else {
