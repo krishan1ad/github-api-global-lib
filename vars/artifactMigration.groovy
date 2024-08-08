@@ -1,18 +1,18 @@
 def call(Map params) {
-    def sourceUrl = params.sourceUrl
+    def sourceUrl = 'http://repository.mpsa.com'
+    def targetUrl = 'http://192.168.1.148:8081/artifactory'
     def sourceRepo = params.sourceRepo
-    def sourceUsername = params.sourceUsername
-    def sourcePassword = params.sourcePassword
-    def targetUrl = params.targetUrl
+    def sourceCredentialsId = params.sourceCredentialsId
     def targetRepo = params.targetRepo
-    def targetUsername = params.targetUsername
-    def targetPassword = params.targetPassword
+    def targetCredentialsId = params.targetCredentialsId
     def tempDir = params.tempDir ?: '/tmp/artifacts'
 
-    if (!sourceUrl || !sourceRepo || !sourceUsername || !sourcePassword ||
-        !targetUrl || !targetRepo || !targetUsername || !targetPassword) {
+    if (!sourceRepo || !sourceCredentialsId || !targetRepo || !targetCredentialsId) {
         error "Missing required parameters for artifact migration."
     }
+
+    def sourceCredentials = getCredentials(sourceCredentialsId)
+    def targetCredentials = getCredentials(targetCredentialsId)
 
     try {
         // Create and clear temporary directory
@@ -23,7 +23,7 @@ def call(Map params) {
 
         // Fetch list of artifacts
         def artifactsJson = sh(script: """
-            curl -sS -u "${sourceUsername}:${sourcePassword}" "${sourceUrl}/api/storage/${sourceRepo}/?list&deep=1" | jq -r '.["files"] | .[]?.uri'
+            curl -sS -u "${sourceCredentials.username}:${sourceCredentials.password}" "${sourceUrl}/api/storage/${sourceRepo}/?list&deep=1" | jq -r '.["files"] | .[]?.uri'
         """, returnStdout: true).trim()
 
         if (!artifactsJson) {
@@ -39,13 +39,13 @@ def call(Map params) {
 
             // Download the artifact
             sh """
-                curl -sSf -u "${sourceUsername}:${sourcePassword}" -X GET "${sourceArtifactUrl}" -o "${tempDir}/${artifactName}"
+                curl -sSf -u "${sourceCredentials.username}:${sourceCredentials.password}" -X GET "${sourceArtifactUrl}" -o "${tempDir}/${artifactName}"
             """
 
             if (fileExists("${tempDir}/${artifactName}")) {
                 // Upload the artifact
                 def uploadStatus = sh(script: """
-                    curl -sSf -u "${targetUsername}:${targetPassword}" -X PUT "${targetArtifactUrl}" -T "${tempDir}/${artifactName}"
+                    curl -sSf -u "${targetCredentials.username}:${targetCredentials.password}" -X PUT "${targetArtifactUrl}" -T "${tempDir}/${artifactName}"
                 """, returnStatus: true)
 
                 if (uploadStatus == 0) {
@@ -66,4 +66,23 @@ def call(Map params) {
     } catch (Exception e) {
         error "Migration process failed: ${e.message}"
     }
+}
+
+// Helper function to get credentials
+def getCredentials(String credentialsId) {
+    def credentials = [:]
+    def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
+        com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl.class,
+        Jenkins.instance,
+        null,
+        null
+    ).find { it.id == credentialsId }
+
+    if (creds) {
+        credentials.username = creds.username
+        credentials.password = creds.password
+    } else {
+        error "Credentials with ID '${credentialsId}' not found."
+    }
+    return credentials
 }
