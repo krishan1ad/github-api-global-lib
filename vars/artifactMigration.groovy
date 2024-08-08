@@ -54,10 +54,14 @@ def call(Map params) {
 
                 // Download the artifact
                 def downloadCmd = """
-                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}" 2> ${tempDir}/download_error.log
+                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}"
                 """
                 echo "Downloading artifact with command: ${downloadCmd}"
-                sh(downloadCmd)
+                def downloadStatus = sh(script: downloadCmd, returnStatus: true)
+
+                if (downloadStatus != 0) {
+                    error "Failed to download artifact from ${sourceArtifactUrl}"
+                }
 
                 // Check if the file exists and is not empty
                 if (fileExists(localFile) && sh(script: "test -s '${localFile}'", returnStatus: true) == 0) {
@@ -66,34 +70,26 @@ def call(Map params) {
                     // Ensure the target directory structure exists on the remote server
                     def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/" 2> ${tempDir}/mkdir_error.log
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
                     """
                     echo "Creating target directory with command: ${mkdirTargetDirCmd}"
-                    sh(mkdirTargetDirCmd)
+                    def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
 
-                    // Print directory creation errors if any
-                    if (fileExists("${tempDir}/mkdir_error.log")) {
-                        echo "Directory creation errors:"
-                        sh "cat ${tempDir}/mkdir_error.log"
+                    if (mkdirStatus != 0) {
+                        error "Failed to create target directory ${targetDirUrl}"
                     }
 
                     // Upload the artifact
                     def uploadCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}" 2> ${tempDir}/upload_error.log
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}"
                     """
                     echo "Uploading artifact with command: ${uploadCmd}"
                     def uploadStatus = sh(script: uploadCmd, returnStatus: true)
 
-                    // Print upload errors if any
-                    if (fileExists("${tempDir}/upload_error.log")) {
-                        echo "Upload errors:"
-                        sh "cat ${tempDir}/upload_error.log"
-                    }
-
                     if (uploadStatus == 0) {
                         echo "Artifact migrated successfully: ${artifactPath}"
                     } else {
-                        echo "Failed to migrate artifact: ${artifactPath}"
+                        error "Failed to upload artifact to ${targetArtifactUrl}"
                     }
 
                     // Clean up the temporary file
