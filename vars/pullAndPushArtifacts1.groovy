@@ -34,10 +34,6 @@ def call(
         }
     }
 
-    // List contents of the download directory to verify folder structure
-    echo "Listing contents of the download directory:"
-    sh 'ls -R download/'
-
     // Discover files and construct upload specifications
     def fileUploadSpecs = []
     def sourcePathInDownload = "download/${sourceArtifactPath}/" // The path where files are downloaded
