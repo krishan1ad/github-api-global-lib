@@ -73,12 +73,12 @@ def call(Map params) {
                     def targetDirPath = artifactDir  // Exclude the repo path
                     def targetDirUrl = "${targetUrl}/${targetRepo}/${targetDirPath}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/" || true
                     """
                     echo "Creating target directory with command: ${mkdirTargetDirCmd}"
                     def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
 
-                    if (mkdirStatus != 0 && mkdirStatus != 405) { // 405 Method Not Allowed if the directory already exists
+                    if (mkdirStatus != 0 && mkdirStatus != 405) { // Ignore 405 Method Not Allowed
                         error "Failed to create target directory ${targetDirUrl}"
                     }
 
