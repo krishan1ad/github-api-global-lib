@@ -42,18 +42,18 @@ def call(
     def fileUploadSpecs = []
     def targetBasePath = "${sourceRepo}/${sourceArtifactPath}/"
 
-    // Use shell command to find all files and process them
+    // Find all files in the download directory and process them
     def fileList = sh(script: 'find download/ -type f', returnStdout: true).trim().split('\n')
 
     fileList.each { filePath ->
         // Construct relative path for upload
         def relativePath = filePath.replaceFirst('^download/', '')
-        def uploadTargetPath = "${targetBasePath}${relativePath}"
+        def targetPath = "${targetBasePath}${relativePath}".replaceFirst('^'+sourceArtifactPath+'/', '')
 
         // Define upload specification for each file
         fileUploadSpecs.add([
             "pattern": filePath,
-            "target": uploadTargetPath
+            "target": targetPath
         ])
     }
 
