@@ -44,7 +44,7 @@ def call(Map params) {
                 // Normalize paths
                 def localFile = "${tempDir}/${artifactPath}".replaceAll('/+', '/')
                 def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}".replaceAll('/+', '/')
-                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}".replaceAll('/+', '/')
+                def targetArtifactUrl = "${targetUrl}/${artifactPath}".replaceAll('/+', '/')
 
                 // Ensure the local directory structure exists
                 def localDir = "${tempDir}/${artifactDir}".replaceAll('/+', '/')
@@ -68,7 +68,7 @@ def call(Map params) {
                     echo "Artifact downloaded successfully: ${localFile}"
 
                     // Ensure the target directory structure exists on the remote server
-                    def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
+                    def targetDirUrl = "${targetUrl}/${artifactDir}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
                         curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
                     """
@@ -98,8 +98,6 @@ def call(Map params) {
                     error "Failed to download or the downloaded file is empty: ${artifactPath}"
                 }
             }
-
-            //clean
 
             echo "Migration process completed."
 
