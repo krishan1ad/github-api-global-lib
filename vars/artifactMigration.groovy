@@ -37,13 +37,16 @@ def call(Map params) {
                 def artifactPath = artifact.replaceFirst("^/${sourceRepo}/", '') // Remove leading repo path
                 def artifactName = artifactPath.split('/').last()
                 def artifactDir = artifactPath - "/${artifactName}"
-                def localFile = "${tempDir}/${artifactPath}"
-                def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}"
-                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}"
+
+                // Normalize paths to avoid double slashes
+                def localFile = "${tempDir}/${artifactPath}".replaceAll('/+', '/')
+                def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}".replaceAll('/+', '/')
+                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}".replaceAll('/+', '/')
 
                 // Ensure the local directory structure exists
+                def localDir = "${tempDir}/${artifactDir}".replaceAll('/+', '/')
                 sh """
-                    mkdir -p "${tempDir}/${artifactDir}"
+                    mkdir -p "${localDir}"
                 """
 
                 // Download the artifact
@@ -54,7 +57,7 @@ def call(Map params) {
                 if (fileExists(localFile)) {
                     // Ensure the target directory structure exists on the remote server
                     sh """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetUrl}/${targetRepo}/${artifactDir}/" > /dev/null 2>&1 || true
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetUrl}/${targetRepo}/${artifactDir}/".replaceAll('/+', '/') > /dev/null 2>&1 || true
                     """
 
                     // Upload the artifact
