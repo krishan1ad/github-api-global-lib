@@ -99,6 +99,8 @@ def call(Map params) {
                 }
             }
 
+            //clean
+
             echo "Migration process completed."
 
         } catch (Exception e) {
