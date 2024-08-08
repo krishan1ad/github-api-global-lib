@@ -5,7 +5,7 @@ def call(Map params) {
     def sourceCredentialsId = params.sourceCredentialsId
     def targetRepo = params.targetRepo
     def targetCredentialsId = params.targetCredentialsId
-    def tempDir = params.tempDir ?: '/tmp/artifacts'
+    def tempDir = "${env.WORKSPACE}/artifacts"  // Use Jenkins workspace directory for temp files
 
     if (!sourceRepo || !sourceCredentialsId || !targetRepo || !targetCredentialsId) {
         error "Missing required parameters for artifact migration."
@@ -54,7 +54,7 @@ def call(Map params) {
 
                 // Download the artifact
                 def downloadCmd = """
-                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}" 2> /tmp/download_error.log
+                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}" 2> ${tempDir}/download_error.log
                 """
                 echo "Downloading artifact with command: ${downloadCmd}"
                 sh(downloadCmd)
@@ -65,28 +65,28 @@ def call(Map params) {
 
                     // Ensure the target directory structure exists on the remote server
                     def mkdirTargetDirCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetUrl}/${targetRepo}/${artifactDir}/".replaceAll('/+', '/') 2> /tmp/mkdir_error.log
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetUrl}/${targetRepo}/${artifactDir}/".replaceAll('/+', '/') 2> ${tempDir}/mkdir_error.log
                     """
                     echo "Creating target directory with command: ${mkdirTargetDirCmd}"
                     sh(mkdirTargetDirCmd)
 
                     // Print directory creation errors if any
-                    if (fileExists('/tmp/mkdir_error.log')) {
+                    if (fileExists("${tempDir}/mkdir_error.log")) {
                         echo "Directory creation errors:"
-                        sh "cat /tmp/mkdir_error.log"
+                        sh "cat ${tempDir}/mkdir_error.log"
                     }
 
                     // Upload the artifact
                     def uploadCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}" 2> /tmp/upload_error.log
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}" 2> ${tempDir}/upload_error.log
                     """
                     echo "Uploading artifact with command: ${uploadCmd}"
                     def uploadStatus = sh(script: uploadCmd, returnStatus: true)
 
                     // Print upload errors if any
-                    if (fileExists('/tmp/upload_error.log')) {
+                    if (fileExists("${tempDir}/upload_error.log")) {
                         echo "Upload errors:"
-                        sh "cat /tmp/upload_error.log"
+                        sh "cat ${tempDir}/upload_error.log"
                     }
 
                     if (uploadStatus == 0) {
