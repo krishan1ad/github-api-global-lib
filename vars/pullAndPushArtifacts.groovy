@@ -1,4 +1,4 @@
-def call(
+def pullAndPushArtifacts(
     String sourceUrl, String sourceRepo, String sourceArtifactPath, 
     String targetUrl, String targetRepo, String targetArtifactPath, 
     String sourceCredentialsId, String targetCredentialsId
