@@ -15,7 +15,7 @@ def call(
     def downloadSpecMap = [
         "files": [
             [
-                "pattern": "${sourceRepo}/${sourceArtifactPath}",
+                "pattern": "${sourceRepo}/${sourceArtifactPath}/**", // Include subfolders
                 "target": "download/"
             ]
         ]
@@ -26,8 +26,8 @@ def call(
     def uploadSpecMap = [
         "files": [
             [
-                "pattern": "download/${sourceArtifactPath}",
-                "target": "${sourceRepo}/${sourceArtifactPath}"
+                "pattern": "download/${sourceArtifactPath}/**", // Include subfolders
+                "target": "${sourceRepo}/${sourceArtifactPath}/"
             ]
         ]
     ]
