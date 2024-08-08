@@ -46,6 +46,10 @@ def call(
             }
         }
 
+        // List contents of the download directory
+        echo "Listing contents of the download directory:"
+        sh 'ls -R download/'
+
         // Upload artifacts to target Artifactory
         withCredentials([usernamePassword(credentialsId: targetCredentialsId, passwordVariable: 'TARGET_PASSWORD', usernameVariable: 'TARGET_USERNAME')]) {
             echo "Uploading artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
