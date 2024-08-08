@@ -70,7 +70,8 @@ def call(Map params) {
                     echo "Artifact downloaded successfully: ${localFile}"
 
                     // Ensure the target directory structure exists on the remote server
-                    def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
+                    def targetDirPath = artifactDir  // Exclude the repo path
+                    def targetDirUrl = "${targetUrl}/${targetRepo}/${targetDirPath}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
                         curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
                     """
