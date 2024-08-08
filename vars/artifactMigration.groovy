@@ -23,26 +23,19 @@ def call(Map params) {
             """
 
             // Create the target repository structure
-            def fetchRepoCmd = """
-                curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" "${targetUrl}/api/repositories/${targetRepo}"
+            def targetRepoUrl = "${targetUrl}/api/repositories/${targetRepo}"
+            def createRepoCmd = """
+                curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X PUT "${targetRepoUrl}" \
+                -H "Content-Type: application/json" \
+                -d '{"rclass":"local","packageType":"generic"}'
             """
-            def checkRepoExists = sh(script: fetchRepoCmd, returnStatus: true)
+            echo "Creating target repository with command: ${createRepoCmd}"
+            def createRepoStatus = sh(script: createRepoCmd, returnStatus: true)
 
-            if (checkRepoExists != 0) {
-                // If the repository does not exist, create it
-                def createRepoCmd = """
-                    curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X PUT "${targetUrl}/api/repositories/${targetRepo}" -H "Content-Type: application/json" -d '{"rclass":"local","packageType":"generic"}'
-                """
-                echo "Creating target repository with command: ${createRepoCmd}"
-                def createRepoStatus = sh(script: createRepoCmd, returnStatus: true)
-
-                if (createRepoStatus != 0) {
-                    error "Failed to create target repository ${targetRepo}"
-                } else {
-                    echo "Target repository ${targetRepo} created successfully."
-                }
+            if (createRepoStatus != 0) {
+                error "Failed to create target repository ${targetRepo}. Check the URL and JSON data."
             } else {
-                echo "Target repository ${targetRepo} already exists."
+                echo "Target repository ${targetRepo} created successfully."
             }
 
             // Fetch list of artifacts
