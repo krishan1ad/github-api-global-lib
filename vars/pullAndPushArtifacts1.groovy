@@ -48,13 +48,13 @@ def call(
     fileList.each { filePath ->
         // Construct relative path for upload
         def relativePath = filePath.replaceFirst('^download/', '')
-        // Construct target path by removing redundant parts
-        def targetPath = "${targetBasePath}${relativePath}".replaceAll('^' + (sourceArtifactPath + '/'), '')
+        // Construct target path ensuring correct directory structure
+        def targetPath = relativePath // This assumes relativePath is correctly aligned with the desired structure
 
         // Define upload specification for each file
         fileUploadSpecs.add([
             "pattern": filePath,
-            "target": targetPath
+            "target": "${targetBasePath}${targetPath}"
         ])
     }
 
