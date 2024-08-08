@@ -3,13 +3,15 @@ def call(Map params) {
     def targetUrl = 'http://192.168.1.148:8081/artifactory'
     def sourceRepo = params.sourceRepo
     def sourceCredentialsId = params.sourceCredentialsId
-    def targetRepo = params.targetRepo
     def targetCredentialsId = params.targetCredentialsId
     def tempDir = "${env.WORKSPACE}/artifacts"  // Use Jenkins workspace directory for temp files
 
-    if (!sourceRepo || !sourceCredentialsId || !targetRepo || !targetCredentialsId) {
+    if (!sourceRepo || !sourceCredentialsId || !targetCredentialsId) {
         error "Missing required parameters for artifact migration."
     }
+
+    // Default target repository is the same as the source repository
+    def targetRepo = params.targetRepo ?: sourceRepo
 
     withCredentials([
         usernamePassword(credentialsId: sourceCredentialsId, usernameVariable: 'SOURCE_USER', passwordVariable: 'SOURCE_PASSWORD'),
@@ -44,7 +46,7 @@ def call(Map params) {
                 // Normalize paths
                 def localFile = "${tempDir}/${artifactPath}".replaceAll('/+', '/')
                 def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}".replaceAll('/+', '/')
-                def targetArtifactUrl = "${targetUrl}/${artifactPath}".replaceAll('/+', '/')
+                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}".replaceAll('/+', '/')
 
                 // Ensure the local directory structure exists
                 def localDir = "${tempDir}/${artifactDir}".replaceAll('/+', '/')
@@ -68,14 +70,14 @@ def call(Map params) {
                     echo "Artifact downloaded successfully: ${localFile}"
 
                     // Ensure the target directory structure exists on the remote server
-                    def targetDirUrl = "${targetUrl}/${artifactDir}".replaceAll('/+', '/')
+                    def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
                         curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
                     """
                     echo "Creating target directory with command: ${mkdirTargetDirCmd}"
                     def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
 
-                    if (mkdirStatus != 0) {
+                    if (mkdirStatus != 0 && mkdirStatus != 405) { // 405 Method Not Allowed if the directory already exists
                         error "Failed to create target directory ${targetDirUrl}"
                     }
 
