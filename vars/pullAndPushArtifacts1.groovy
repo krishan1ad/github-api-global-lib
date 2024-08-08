@@ -1,52 +1,61 @@
 import groovy.json.JsonOutput
 
 def call(
-    String sourceUrl, String sourceRepo, String sourceArtifactPath, 
-    String targetUrl, String sourceCredentialsId, String targetCredentialsId
+    String sourceUrl, String repoPath, 
+    String credentialsId
 ) {
     // Initialize JFrog Artifactory servers
     def sourceArtifactory = Artifactory.server(sourceUrl)
-    def targetArtifactory = Artifactory.server(targetUrl)
+    def targetArtifactory = Artifactory.server(sourceUrl)
 
-    // Define download specification for source Artifactory as JSON string
-    def downloadSpecMap = [
-        "files": [
-            [
-                "pattern": "${sourceRepo}/${sourceArtifactPath}",
-                "target": "download/"
+    // Use the credentials from the credentials ID
+    withCredentials([usernamePassword(credentialsId: credentialsId, usernameVariable: 'ARTIFACTORY_USER', passwordVariable: 'ARTIFACTORY_PASSWORD')]) {
+        // Define download specification for source Artifactory as JSON string
+        def downloadSpecMap = [
+            "files": [
+                [
+                    "pattern": "${repoPath}",
+                    "target": "download/"
+                ]
             ]
         ]
-    ]
-    def downloadSpecJson = JsonOutput.toJson(downloadSpecMap)
+        def downloadSpecJson = JsonOutput.toJson(downloadSpecMap)
 
-    // Define upload specification for target Artifactory as JSON string
-    def uploadSpecMap = [
-        "files": [
-            [
-                "pattern": "download/${sourceArtifactPath}",
-                "target": "${sourceRepo}/${sourceArtifactPath}"
+        // Define upload specification for target Artifactory as JSON string
+        def uploadSpecMap = [
+            "files": [
+                [
+                    "pattern": "download/${repoPath}",
+                    "target": "${repoPath}"
+                ]
             ]
         ]
-    ]
-    def uploadSpecJson = JsonOutput.toJson(uploadSpecMap)
+        def uploadSpecJson = JsonOutput.toJson(uploadSpecMap)
 
-    try {
-        // Download artifacts from source Artifactory
-        def downloadResponse = sourceArtifactory.download(downloadSpecJson)
-        if (downloadResponse) {
-            echo "Successfully downloaded artifacts from ${sourceUrl}/${sourceRepo}/${sourceArtifactPath}"
-        } else {
-            error "Failed to download artifacts from ${sourceUrl}/${sourceRepo}/${sourceArtifactPath}"
-        }
+        try {
+            // Download artifacts from source Artifactory
+            def downloadResponse = sourceArtifactory.download(downloadSpecJson, [
+                username: "${ARTIFACTORY_USER}",
+                password: "${ARTIFACTORY_PASSWORD}"
+            ])
+            if (downloadResponse) {
+                echo "Successfully downloaded artifacts from ${sourceUrl}/${repoPath}"
+            } else {
+                error "Failed to download artifacts from ${sourceUrl}/${repoPath}"
+            }
 
-        // Upload artifacts to target Artifactory
-        def uploadResponse = targetArtifactory.upload(uploadSpecJson)
-        if (uploadResponse) {
-            echo "Successfully uploaded artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
-        } else {
-            error "Failed to upload artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
+            // Upload artifacts to target Artifactory
+            def uploadResponse = targetArtifactory.upload(uploadSpecJson, [
+                username: "${ARTIFACTORY_USER}",
+                password: "${ARTIFACTORY_PASSWORD}"
+            ])
+            if (uploadResponse) {
+                echo "Successfully uploaded artifacts to ${sourceUrl}/${repoPath}"
+            } else {
+                error "Failed to upload artifacts to ${sourceUrl}/${repoPath}"
+            }
+        } catch (Exception e) {
+            error "An error occurred: ${e.message}"
         }
-    } catch (Exception e) {
-        error "An error occurred: ${e.message}"
     }
 }
