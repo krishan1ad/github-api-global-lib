@@ -1,15 +1,17 @@
 def call(
-    String sourceRepo, String sourceArtifactPath, 
-    String targetRepo
+    String sourceRepo, String sourceArtifactPath
 ) {
+    // Retrieve global environment variables
     def sourceUrl = env.SOURCE_URL
     def targetUrl = env.TARGET_URL
     def sourceCredentialsId = env.SOURCE_CREDENTIALS_ID
     def targetCredentialsId = env.TARGET_CREDENTIALS_ID
 
+    // Initialize JFrog Artifactory servers
     def sourceArtifactory = Artifactory.server(sourceUrl)
     def targetArtifactory = Artifactory.server(targetUrl)
 
+    // Define download specification for source Artifactory as JSON string
     def downloadSpecMap = [
         "files": [
             [
@@ -20,18 +22,16 @@ def call(
     ]
     def downloadSpecJson = groovy.json.JsonOutput.toJson(downloadSpecMap)
 
+    // Define upload specification for target Artifactory as JSON string
     def uploadSpecMap = [
         "files": [
             [
                 "pattern": "download/${sourceArtifactPath}",
-                "target": "${targetRepo}/${sourceArtifactPath}"
+                "target": "${sourceRepo}/${sourceArtifactPath}"
             ]
         ]
     ]
     def uploadSpecJson = groovy.json.JsonOutput.toJson(uploadSpecMap)
-
-    int retryCount = 3
-    int retryDelay = 30 // seconds
 
     try {
         // Download artifacts from source Artifactory
@@ -44,28 +44,14 @@ def call(
             }
         }
 
-        // Upload artifacts to target Artifactory with retry
-        boolean uploadSuccessful = false
-        for (int i = 0; i < retryCount; i++) {
-            try {
-                withCredentials([usernamePassword(credentialsId: targetCredentialsId, passwordVariable: 'TARGET_PASSWORD', usernameVariable: 'TARGET_USERNAME')]) {
-                    def uploadResponse = targetArtifactory.upload(uploadSpecJson)
-                    if (uploadResponse) {
-                        echo "Successfully uploaded artifacts to ${targetUrl}/${targetRepo}/${sourceArtifactPath}"
-                        uploadSuccessful = true
-                        break
-                    } else {
-                        echo "Failed to upload artifacts. Retrying in ${retryDelay} seconds..."
-                    }
-                }
-            } catch (Exception e) {
-                echo "An error occurred during upload: ${e.message}. Retrying in ${retryDelay} seconds..."
+        // Upload artifacts to target Artifactory
+        withCredentials([usernamePassword(credentialsId: targetCredentialsId, passwordVariable: 'TARGET_PASSWORD', usernameVariable: 'TARGET_USERNAME')]) {
+            def uploadResponse = targetArtifactory.upload(uploadSpecJson)
+            if (uploadResponse) {
+                echo "Successfully uploaded artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
+            } else {
+                error "Failed to upload artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
             }
-            sleep retryDelay
-        }
-
-        if (!uploadSuccessful) {
-            error "Failed to upload artifacts to ${targetUrl}/${targetRepo}/${sourceArtifactPath} after ${retryCount} attempts"
         }
     } catch (Exception e) {
         error "An error occurred: ${e.message}"
