@@ -1,7 +1,13 @@
 def call(
-    String sourceUrl, String sourceRepo, String sourceArtifactPath, 
-    String targetUrl, String sourceCredentialsId, String targetCredentialsId
+    String sourceRepo, String sourceArtifactPath, 
+    String targetRepo
 ) {
+    // Retrieve global environment variables
+    def sourceUrl = env.SOURCE_URL
+    def targetUrl = env.TARGET_URL
+    def sourceCredentialsId = env.SOURCE_CREDENTIALS_ID
+    def targetCredentialsId = env.TARGET_CREDENTIALS_ID
+
     // Initialize JFrog Artifactory servers
     def sourceArtifactory = Artifactory.server(sourceUrl)
     def targetArtifactory = Artifactory.server(targetUrl)
@@ -22,7 +28,7 @@ def call(
         "files": [
             [
                 "pattern": "download/${sourceArtifactPath}",
-                "target": "${sourceRepo}/${sourceArtifactPath}"
+                "target": "${targetRepo}/${sourceArtifactPath}"
             ]
         ]
     ]
@@ -43,9 +49,9 @@ def call(
         withCredentials([usernamePassword(credentialsId: targetCredentialsId, passwordVariable: 'TARGET_PASSWORD', usernameVariable: 'TARGET_USERNAME')]) {
             def uploadResponse = targetArtifactory.upload(uploadSpecJson)
             if (uploadResponse) {
-                echo "Successfully uploaded artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
+                echo "Successfully uploaded artifacts to ${targetUrl}/${targetRepo}/${sourceArtifactPath}"
             } else {
-                error "Failed to upload artifacts to ${targetUrl}/${sourceRepo}/${sourceArtifactPath}"
+                error "Failed to upload artifacts to ${targetUrl}/${targetRepo}/${sourceArtifactPath}"
             }
         }
     } catch (Exception e) {
