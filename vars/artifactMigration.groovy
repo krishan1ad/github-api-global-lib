@@ -3,15 +3,13 @@ def call(Map params) {
     def targetUrl = 'http://192.168.1.148:8081/artifactory'
     def sourceRepo = params.sourceRepo
     def sourceCredentialsId = params.sourceCredentialsId
+    def targetRepo = params.targetRepo ?: sourceRepo
     def targetCredentialsId = params.targetCredentialsId
     def tempDir = "${env.WORKSPACE}/artifacts"  // Use Jenkins workspace directory for temp files
 
     if (!sourceRepo || !sourceCredentialsId || !targetCredentialsId) {
         error "Missing required parameters for artifact migration."
     }
-
-    // Default target repository is the same as the source repository
-    def targetRepo = params.targetRepo ?: sourceRepo
 
     withCredentials([
         usernamePassword(credentialsId: sourceCredentialsId, usernameVariable: 'SOURCE_USER', passwordVariable: 'SOURCE_PASSWORD'),
@@ -23,6 +21,29 @@ def call(Map params) {
                 mkdir -p "${tempDir}"
                 rm -rf "${tempDir}/*"
             """
+
+            // Create the target repository structure
+            def fetchRepoCmd = """
+                curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" "${targetUrl}/api/repositories/${targetRepo}"
+            """
+            def checkRepoExists = sh(script: fetchRepoCmd, returnStatus: true)
+
+            if (checkRepoExists != 0) {
+                // If the repository does not exist, create it
+                def createRepoCmd = """
+                    curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X PUT "${targetUrl}/api/repositories/${targetRepo}" -H "Content-Type: application/json" -d '{"rclass":"local","packageType":"generic"}'
+                """
+                echo "Creating target repository with command: ${createRepoCmd}"
+                def createRepoStatus = sh(script: createRepoCmd, returnStatus: true)
+
+                if (createRepoStatus != 0) {
+                    error "Failed to create target repository ${targetRepo}"
+                } else {
+                    echo "Target repository ${targetRepo} created successfully."
+                }
+            } else {
+                echo "Target repository ${targetRepo} already exists."
+            }
 
             // Fetch list of artifacts
             def fetchArtifactsCmd = """
@@ -38,7 +59,7 @@ def call(Map params) {
 
             def artifacts = artifactsJson.split('\n')
 
-            artifacts.each { artifact ->
+            for (artifact in artifacts) {
                 def artifactPath = artifact.replaceFirst("^/${sourceRepo}/", '')
                 def artifactName = artifactPath.split('/').last()
                 def artifactDir = artifactPath - "/${artifactName}"
@@ -70,15 +91,14 @@ def call(Map params) {
                     echo "Artifact downloaded successfully: ${localFile}"
 
                     // Ensure the target directory structure exists on the remote server
-                    def targetDirPath = artifactDir  // Exclude the repo path
-                    def targetDirUrl = "${targetUrl}/${targetRepo}/${targetDirPath}".replaceAll('/+', '/')
+                    def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/" || true
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
                     """
                     echo "Creating target directory with command: ${mkdirTargetDirCmd}"
                     def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
 
-                    if (mkdirStatus != 0 && mkdirStatus != 405) { // Ignore 405 Method Not Allowed
+                    if (mkdirStatus != 0) {
                         error "Failed to create target directory ${targetDirUrl}"
                     }
 
