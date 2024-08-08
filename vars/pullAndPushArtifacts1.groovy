@@ -10,7 +10,7 @@ def call(
 
     // Use the credentials from the credentials ID
     withCredentials([usernamePassword(credentialsId: credentialsId, usernameVariable: 'ARTIFACTORY_USER', passwordVariable: 'ARTIFACTORY_PASSWORD')]) {
-        // Define download specification for source Artifactory
+        // Define download specification for source Artifactory as a JSON string
         def downloadSpecMap = [
             "files": [
                 [
@@ -19,8 +19,9 @@ def call(
                 ]
             ]
         ]
+        def downloadSpecJson = JsonOutput.toJson(downloadSpecMap)
 
-        // Define upload specification for target Artifactory
+        // Define upload specification for target Artifactory as a JSON string
         def uploadSpecMap = [
             "files": [
                 [
@@ -29,10 +30,11 @@ def call(
                 ]
             ]
         ]
+        def uploadSpecJson = JsonOutput.toJson(uploadSpecMap)
 
         try {
             // Download artifacts from source Artifactory
-            def downloadResponse = sourceArtifactory.download(downloadSpecMap)
+            def downloadResponse = sourceArtifactory.download(downloadSpecJson)
             if (downloadResponse) {
                 echo "Successfully downloaded artifacts from ${sourceUrl}/${repoPath}"
             } else {
@@ -40,7 +42,7 @@ def call(
             }
 
             // Upload artifacts to target Artifactory
-            def uploadResponse = targetArtifactory.upload(uploadSpecMap)
+            def uploadResponse = targetArtifactory.upload(uploadSpecJson)
             if (uploadResponse) {
                 echo "Successfully uploaded artifacts to ${sourceUrl}/${repoPath}"
             } else {
