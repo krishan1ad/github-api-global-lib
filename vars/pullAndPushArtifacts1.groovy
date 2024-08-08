@@ -38,30 +38,42 @@ def call(
     echo "Listing contents of the download directory:"
     sh 'ls -R download/'
 
-    // Dynamically construct the upload target path
-    def uploadTargetPath = "${sourceRepo}/${sourceArtifactPath}/"
-    echo "Target path for upload: ${uploadTargetPath}"
+    // Discover files and construct upload specifications
+    def fileUploadSpecs = []
+    def targetBasePath = "${sourceRepo}/${sourceArtifactPath}/"
 
-    // Define upload specification for target Artifactory as JSON string
+    // Use shell command to find all files and process them
+    def fileList = sh(script: 'find download/ -type f', returnStdout: true).trim().split('\n')
+
+    fileList.each { filePath ->
+        // Construct relative path for upload
+        def relativePath = filePath.replaceFirst('^download/', '')
+        def uploadTargetPath = "${targetBasePath}${relativePath}"
+
+        // Define upload specification for each file
+        fileUploadSpecs.add([
+            "pattern": filePath,
+            "target": uploadTargetPath
+        ])
+    }
+
+    // Convert upload specifications to JSON
     def uploadSpecMap = [
-        "files": [
-            [
-                "pattern": "download/${sourceArtifactPath}/**", // Include all files and subfolders
-                "target": uploadTargetPath // Preserve the full path structure
-            ]
-        ]
+        "files": fileUploadSpecs
     ]
     def uploadSpecJson = groovy.json.JsonOutput.toJson(uploadSpecMap)
 
+    echo "Upload specification: ${uploadSpecJson}"
+
     // Upload artifacts to target Artifactory
     withCredentials([usernamePassword(credentialsId: targetCredentialsId, passwordVariable: 'TARGET_PASSWORD', usernameVariable: 'TARGET_USERNAME')]) {
-        echo "Uploading artifacts to ${targetUrl}/${uploadTargetPath}"
+        echo "Uploading artifacts to ${targetUrl}"
         def uploadResponse = targetArtifactory.upload(uploadSpecJson)
         echo "Upload response: ${uploadResponse}"
         if (uploadResponse) {
-            echo "Successfully uploaded artifacts to ${targetUrl}/${uploadTargetPath}"
+            echo "Successfully uploaded artifacts to ${targetUrl}"
         } else {
-            error "Failed to upload artifacts to ${targetUrl}/${uploadTargetPath}"
+            error "Failed to upload artifacts to ${targetUrl}"
         }
     }
 }
