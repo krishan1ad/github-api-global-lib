@@ -60,7 +60,10 @@ def call(Map params) {
                 sh(downloadCmd)
 
                 // Print download errors if any
-                sh "cat /tmp/download_error.log || true"
+                if (fileExists('/tmp/download_error.log')) {
+                    echo "Download errors:"
+                    sh "cat /tmp/download_error.log"
+                }
 
                 if (fileExists(localFile)) {
                     // Ensure the target directory structure exists on the remote server
@@ -71,7 +74,10 @@ def call(Map params) {
                     sh(mkdirTargetDirCmd)
 
                     // Print directory creation errors if any
-                    sh "cat /tmp/mkdir_error.log || true"
+                    if (fileExists('/tmp/mkdir_error.log')) {
+                        echo "Directory creation errors:"
+                        sh "cat /tmp/mkdir_error.log"
+                    }
 
                     // Upload the artifact
                     def uploadCmd = """
@@ -81,7 +87,10 @@ def call(Map params) {
                     def uploadStatus = sh(script: uploadCmd, returnStatus: true)
 
                     // Print upload errors if any
-                    sh "cat /tmp/upload_error.log || true"
+                    if (fileExists('/tmp/upload_error.log')) {
+                        echo "Upload errors:"
+                        sh "cat /tmp/upload_error.log"
+                    }
 
                     if (uploadStatus == 0) {
                         echo "Artifact migrated successfully: ${artifactPath}"
