@@ -1,5 +1,5 @@
 def call(Map params) {
-    def sourceUrl = 'https://repository.mpa.com'  // Updated to HTTPS
+    def sourceUrl = 'https://repository.mpsa.com'  // Updated to HTTPS
     def targetUrl = 'http://192.168.1.148:8081/artifactory'
     def sourceRepo = params.sourceRepo
     def sourceCredentialsId = params.sourceCredentialsId
