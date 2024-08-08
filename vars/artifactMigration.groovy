@@ -22,7 +22,7 @@ def call(Map params) {
                 rm -rf "${tempDir}/*"
             """
 
-            // Create the target repository structure
+            // Create the target repository
             def targetRepoUrl = "${targetUrl}/api/repositories/${targetRepo}"
             def createRepoCmd = """
                 curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X PUT "${targetRepoUrl}" \
@@ -38,84 +38,87 @@ def call(Map params) {
                 echo "Target repository ${targetRepo} created successfully."
             }
 
-            // Fetch list of artifacts
-            def fetchArtifactsCmd = """
-                curl -sS -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" "${sourceUrl}/api/storage/${sourceRepo}/?list&deep=1" | jq -r '.files[]?.uri'
-            """
-            echo "Fetching artifacts with command: ${fetchArtifactsCmd}"
+            // Skip downloading for testing repository creation
+            return
 
-            def artifactsJson = sh(script: fetchArtifactsCmd, returnStdout: true).trim()
+            // Fetch list of artifacts (skipped for now)
+            // def fetchArtifactsCmd = """
+            //     curl -sS -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" "${sourceUrl}/api/storage/${sourceRepo}/?list&deep=1" | jq -r '.files[]?.uri'
+            // """
+            // echo "Fetching artifacts with command: ${fetchArtifactsCmd}"
 
-            if (!artifactsJson) {
-                error "Failed to fetch artifacts from source repository or no artifacts found."
-            }
+            // def artifactsJson = sh(script: fetchArtifactsCmd, returnStdout: true).trim()
 
-            def artifacts = artifactsJson.split('\n')
+            // if (!artifactsJson) {
+            //     error "Failed to fetch artifacts from source repository or no artifacts found."
+            // }
 
-            for (artifact in artifacts) {
-                def artifactPath = artifact.replaceFirst("^/${sourceRepo}/", '')
-                def artifactName = artifactPath.split('/').last()
-                def artifactDir = artifactPath - "/${artifactName}"
+            // def artifacts = artifactsJson.split('\n')
 
-                // Normalize paths
-                def localFile = "${tempDir}/${artifactPath}".replaceAll('/+', '/')
-                def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}".replaceAll('/+', '/')
-                def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}".replaceAll('/+', '/')
+            // for (artifact in artifacts) {
+            //     def artifactPath = artifact.replaceFirst("^/${sourceRepo}/", '')
+            //     def artifactName = artifactPath.split('/').last()
+            //     def artifactDir = artifactPath - "/${artifactName}"
 
-                // Ensure the local directory structure exists
-                def localDir = "${tempDir}/${artifactDir}".replaceAll('/+', '/')
-                sh """
-                    mkdir -p "${localDir}"
-                """
+            //     // Normalize paths
+            //     def localFile = "${tempDir}/${artifactPath}".replaceAll('/+', '/')
+            //     def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}".replaceAll('/+', '/')
+            //     def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}".replaceAll('/+', '/')
 
-                // Download the artifact
-                def downloadCmd = """
-                    curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}"
-                """
-                echo "Downloading artifact with command: ${downloadCmd}"
-                def downloadStatus = sh(script: downloadCmd, returnStatus: true)
+            //     // Ensure the local directory structure exists
+            //     def localDir = "${tempDir}/${artifactDir}".replaceAll('/+', '/')
+            //     sh """
+            //         mkdir -p "${localDir}"
+            //     """
 
-                if (downloadStatus != 0) {
-                    error "Failed to download artifact from ${sourceArtifactUrl}"
-                }
+            //     // Download the artifact
+            //     def downloadCmd = """
+            //         curl -sSf -u "\${SOURCE_USER}:\${SOURCE_PASSWORD}" -o "${localFile}" "${sourceArtifactUrl}"
+            //     """
+            //     echo "Downloading artifact with command: ${downloadCmd}"
+            //     def downloadStatus = sh(script: downloadCmd, returnStatus: true)
 
-                // Check if the file exists and is not empty
-                if (fileExists(localFile) && sh(script: "test -s '${localFile}'", returnStatus: true) == 0) {
-                    echo "Artifact downloaded successfully: ${localFile}"
+            //     if (downloadStatus != 0) {
+            //         error "Failed to download artifact from ${sourceArtifactUrl}"
+            //     }
 
-                    // Ensure the target directory structure exists on the remote server
-                    def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
-                    def mkdirTargetDirCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
-                    """
-                    echo "Creating target directory with command: ${mkdirTargetDirCmd}"
-                    def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
+            //     // Check if the file exists and is not empty
+            //     if (fileExists(localFile) && sh(script: "test -s '${localFile}'", returnStatus: true) == 0) {
+            //         echo "Artifact downloaded successfully: ${localFile}"
 
-                    if (mkdirStatus != 0) {
-                        error "Failed to create target directory ${targetDirUrl}"
-                    }
+            //         // Ensure the target directory structure exists on the remote server
+            //         def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
+            //         def mkdirTargetDirCmd = """
+            //             curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
+            //         """
+            //         echo "Creating target directory with command: ${mkdirTargetDirCmd}"
+            //         def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
 
-                    // Upload the artifact
-                    def uploadCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}"
-                    """
-                    echo "Uploading artifact with command: ${uploadCmd}"
-                    def uploadStatus = sh(script: uploadCmd, returnStatus: true)
+            //         if (mkdirStatus != 0) {
+            //             error "Failed to create target directory ${targetDirUrl}"
+            //         }
 
-                    if (uploadStatus == 0) {
-                        echo "Artifact migrated successfully: ${artifactPath}"
-                    } else {
-                        error "Failed to upload artifact to ${targetArtifactUrl}"
-                    }
+            //         // Upload the artifact
+            //         def uploadCmd = """
+            //             curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -T "${localFile}" "${targetArtifactUrl}"
+            //         """
+            //         echo "Uploading artifact with command: ${uploadCmd}"
+            //         def uploadStatus = sh(script: uploadCmd, returnStatus: true)
 
-                    // Clean up the temporary file
-                    sh "rm '${localFile}'"
-                } else {
-                    error "Failed to download or the downloaded file is empty: ${artifactPath}"
-                }
-            }
+            //         if (uploadStatus == 0) {
+            //             echo "Artifact migrated successfully: ${artifactPath}"
+            //         } else {
+            //             error "Failed to upload artifact to ${targetArtifactUrl}"
+            //         }
 
-            echo "Migration process completed."
+            //         // Clean up the temporary file
+            //         sh "rm '${localFile}'"
+            //     } else {
+            //         error "Failed to download or the downloaded file is empty: ${artifactPath}"
+            //     }
+            // }
+
+            // echo "Migration process completed."
 
         } catch (Exception e) {
             error "Migration process failed: ${e.message}"
