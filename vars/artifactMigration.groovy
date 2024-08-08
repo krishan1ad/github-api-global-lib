@@ -59,13 +59,10 @@ def call(Map params) {
                 echo "Downloading artifact with command: ${downloadCmd}"
                 sh(downloadCmd)
 
-                // Print download errors if any
-                if (fileExists('/tmp/download_error.log')) {
-                    echo "Download errors:"
-                    sh "cat /tmp/download_error.log"
-                }
+                // Check if the file exists and is not empty
+                if (fileExists(localFile) && sh(script: "test -s '${localFile}'", returnStatus: true) == 0) {
+                    echo "Artifact downloaded successfully: ${localFile}"
 
-                if (fileExists(localFile)) {
                     // Ensure the target directory structure exists on the remote server
                     def mkdirTargetDirCmd = """
                         curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetUrl}/${targetRepo}/${artifactDir}/".replaceAll('/+', '/') 2> /tmp/mkdir_error.log
@@ -101,7 +98,7 @@ def call(Map params) {
                     // Clean up the temporary file
                     sh "rm '${localFile}'"
                 } else {
-                    error "Failed to download artifact: ${artifactPath}"
+                    error "Failed to download or the downloaded file is empty: ${artifactPath}"
                 }
             }
 
