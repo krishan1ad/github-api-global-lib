@@ -45,6 +45,18 @@ def call(Map params) {
                 def localFile = "${tempDir}/${artifactPath}".replaceAll('/+', '/')
                 def sourceArtifactUrl = "${sourceUrl}/${sourceRepo}/${artifactPath}".replaceAll('/+', '/')
                 def targetArtifactUrl = "${targetUrl}/${targetRepo}/${artifactPath}".replaceAll('/+', '/')
+                def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
+
+                // Check if the target file already exists
+                def fileExistsCmd = """
+                    curl -sI -u "\${TARGET_USER}:\${TARGET_PASSWORD}" "${targetArtifactUrl}" | grep -q "HTTP/1.1 200 OK"
+                """
+                def fileExists = sh(script: fileExistsCmd, returnStatus: true) == 0
+
+                if (fileExists) {
+                    echo "Skipping migration for existing artifact: ${artifactPath}"
+                    continue
+                }
 
                 // Ensure the local directory structure exists
                 def localDir = "${tempDir}/${artifactDir}".replaceAll('/+', '/')
@@ -68,16 +80,11 @@ def call(Map params) {
                     echo "Artifact downloaded successfully: ${localFile}"
 
                     // Ensure the target directory structure exists on the remote server
-                    def targetDirUrl = "${targetUrl}/${targetRepo}/${artifactDir}".replaceAll('/+', '/')
                     def mkdirTargetDirCmd = """
-                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/"
+                        curl -sSf -u "\${TARGET_USER}:\${TARGET_PASSWORD}" -X MKCOL "${targetDirUrl}/" 2>/dev/null || true
                     """
                     echo "Creating target directory with command: ${mkdirTargetDirCmd}"
-                    def mkdirStatus = sh(script: mkdirTargetDirCmd, returnStatus: true)
-
-                    if (mkdirStatus != 0) {
-                        error "Failed to create target directory ${targetDirUrl}"
-                    }
+                    sh(mkdirTargetDirCmd)
 
                     // Upload the artifact
                     def uploadCmd = """
